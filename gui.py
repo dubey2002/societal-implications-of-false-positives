@@ -1,24 +1,31 @@
 import os
-
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
-    QFileDialog,
     QLabel,
     QVBoxLayout,
     QHBoxLayout,
     QWidget,
     QGridLayout,
+    QTextEdit,
 )
 from news_analysis import (
     is_model_trained,
     get_trained_model,
-    get_text_file_content,
     get_analyzation_result,
     save_result_in_file,
 )
+class BlinkingLabel(QLabel):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.animation = QPropertyAnimation(self, b"visible")
+        self.animation.setDuration(500)
+        self.animation.setStartValue(True)
+        self.animation.setEndValue(False)
+        self.animation.setLoopCount(-1)
+        self.animation.start()
 
 
 class MainWindow(QMainWindow):
@@ -41,7 +48,7 @@ class MainWindow(QMainWindow):
 
         self.is_model_trained_label = QLabel(self)
         self.is_model_trained_label.setText(
-            'Model trained and ready. Select an article and click "Analyse" to start.'
+           '<font color="#FF0000"><b> Model trained and ready.Input text and click "Analyse" to start.</b></font>'
             if is_model_trained()
             else 'Model training and analysis will begin after clicking "Analyse". Please note that it may take some time.'
         )
@@ -53,41 +60,10 @@ class MainWindow(QMainWindow):
 
         self.box_layout.addSpacing(26)
 
-        self.file_layout = QHBoxLayout()
-        self.box_layout.addLayout(self.file_layout)
-
-        self.selected_file_label = QLabel(self)
-        self.selected_file_label.setMaximumWidth(160)
-        self.selected_file_label.setText("Select Article Text File:")
-        self.selected_file_label.setFont(QFont("Arial", 11))
-
-        self.file_dialog_button = QPushButton("No file selected", self)
-        self.file_dialog_button.setMaximumWidth(380)
-        self.file_dialog_button.clicked.connect(self.get_file_name)
-        self.file_dialog_button.setFont(QFont("Arial", 11))
-        self.file_dialog_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                color: #6c757d;
-                border-color: #6c757d;
-            }
-            QPushButton:hover {
-                color: #fff;
-                background-color: #6c757d;
-                border-color: #6c757d;
-            }
-            QPushButton:pressed {
-                color: #fff;
-                background-color: #6c757d;
-                border-color: #6c757d;
-            }
-        """
-        )
-        self.file_dialog_button.setCursor(Qt.PointingHandCursor)
-
-        self.file_layout.addWidget(self.selected_file_label, stretch=0)
-        self.file_layout.addWidget(self.file_dialog_button, stretch=0)
+        self.text_input = QTextEdit(self)
+        self.text_input.setFont(QFont("Arial", 11))
+        self.text_input.setFixedSize(400, 150) 
+        self.box_layout.addWidget(self.text_input, alignment=Qt.AlignHCenter)
 
         self.box_layout.addSpacing(26)
 
@@ -110,7 +86,7 @@ class MainWindow(QMainWindow):
             }
         """
         )
-        self.submit_button.clicked.connect(self.analyse_file)
+        self.submit_button.clicked.connect(self.analyse_text)
         self.submit_button.setCursor(Qt.PointingHandCursor)
         self.box_layout.addWidget(self.submit_button, alignment=Qt.AlignHCenter)
 
@@ -163,20 +139,8 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(self.widget)
 
-    def get_file_name(self):
-        file_filter = "Text files (*.txt)"
-        response = QFileDialog.getOpenFileName(
-            parent=self,
-            caption="Select a file",
-            filter=file_filter,
-        )
-        self.selected_file_path = response[0]
-        file_name = os.path.basename(self.selected_file_path)
-        self.selected_file_name = file_name
-        self.file_dialog_button.setText(file_name)
-
-    def analyse_file(self):
-        raw_user_article_text = get_text_file_content(self.selected_file_path)
+    def analyse_text(self):
+        raw_user_article_text = self.text_input.toPlainText()
         vectorizer, clf = get_trained_model()
         result = get_analyzation_result(clf, vectorizer, raw_user_article_text)
         sentiment = result["sentiment"]
@@ -239,3 +203,13 @@ class MainWindow(QMainWindow):
         self.fake_news_result_label.setText(
             f"{fake_news_emoji} The article is {accuracy}% {label.lower()}"
         )
+
+
+if __name__ == "__main__":
+    import sys
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+    mainWin = MainWindow()
+    mainWin.show()
+    sys.exit(app.exec())
